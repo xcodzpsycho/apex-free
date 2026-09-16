@@ -1,12 +1,10 @@
--- APEX HUB Utility-Script (Advanced Roles, Gun ESP, Auto Grab, Bring & Map Voting Loops)
--- Ausführen in einem LocalScript (z. B. StarterPlayerScripts oder StarterGui)
-
+-- APEX HUB Utility-Script (Advanced Edition mit Auto Grab Gun, Bring Player & Map Vote Spammer)
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
-local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
@@ -14,19 +12,16 @@ local Camera = workspace.CurrentCamera
 -- Statusvariablen
 local espEnabled = false
 local rolesEnabled = false
+local gunEspEnabled = false
+local autoGrabGunEnabled = false
 local speedEnabled = false
 local infJumpEnabled = false
 local noclipEnabled = false
 local flyEnabled = false
 local antiFlingEnabled = true
-local autoGrabGunEnabled = false
 local currentSpeed = 50
 local currentFlySpeed = 50
 local currentMode = "Normal"
-
--- Map Voting Loops Status
-local activeMapSpam = nil -- "Map1", "Map2", "Map3" oder nil
-local spamTargetPlayer = nil
 
 local savedPositionRed = nil
 local savedPositionGreen = nil
@@ -35,6 +30,8 @@ local tpVisualPartGreen = nil
 
 local registeredToggles = {}
 local registeredSpeedInputs = {}
+
+local activeLoops = {}
 
 local themes = {
     Dark = {
@@ -69,22 +66,6 @@ local themes = {
         ButtonOn = Color3.fromRGB(50, 180, 100),
         ButtonOff = Color3.fromRGB(40, 25, 25)
     },
-    Emerald = {
-        Primary = Color3.fromRGB(15, 25, 20),
-        TopGrad1 = Color3.fromRGB(30, 160, 80),
-        TopGrad2 = Color3.fromRGB(20, 100, 120),
-        Stroke = Color3.fromRGB(40, 180, 100),
-        ButtonOn = Color3.fromRGB(40, 200, 120),
-        ButtonOff = Color3.fromRGB(25, 40, 35)
-    },
-    Sunset = {
-        Primary = Color3.fromRGB(30, 20, 25),
-        TopGrad1 = Color3.fromRGB(220, 80, 120),
-        TopGrad2 = Color3.fromRGB(240, 140, 60),
-        Stroke = Color3.fromRGB(200, 90, 130),
-        ButtonOn = Color3.fromRGB(80, 200, 120),
-        ButtonOff = Color3.fromRGB(45, 30, 40)
-    },
     Cyberpunk = {
         Primary = Color3.fromRGB(18, 18, 30),
         TopGrad1 = Color3.fromRGB(255, 0, 128),
@@ -92,22 +73,6 @@ local themes = {
         Stroke = Color3.fromRGB(255, 0, 128),
         ButtonOn = Color3.fromRGB(0, 255, 128),
         ButtonOff = Color3.fromRGB(30, 30, 50)
-    },
-    Matrix = {
-        Primary = Color3.fromRGB(10, 20, 10),
-        TopGrad1 = Color3.fromRGB(0, 200, 80),
-        TopGrad2 = Color3.fromRGB(0, 100, 40),
-        Stroke = Color3.fromRGB(0, 255, 100),
-        ButtonOn = Color3.fromRGB(0, 255, 120),
-        ButtonOff = Color3.fromRGB(20, 35, 20)
-    },
-    Midnight = {
-        Primary = Color3.fromRGB(12, 15, 22),
-        TopGrad1 = Color3.fromRGB(70, 90, 200),
-        TopGrad2 = Color3.fromRGB(30, 40, 90),
-        Stroke = Color3.fromRGB(90, 110, 220),
-        ButtonOn = Color3.fromRGB(50, 200, 150),
-        ButtonOff = Color3.fromRGB(22, 28, 40)
     }
 }
 local currentThemeName = "Dark"
@@ -142,8 +107,7 @@ DeviceSelectorGui.Active = true
 DeviceSelectorGui.Draggable = true
 DeviceSelectorGui.Parent = ScreenGui
 
-local dsCorner = Instance.new("UICorner", DeviceSelectorGui)
-dsCorner.CornerRadius = UDim.new(0, 10)
+Instance.new("UICorner", DeviceSelectorGui).CornerRadius = UDim.new(0, 10)
 local dsStroke = Instance.new("UIStroke", DeviceSelectorGui)
 dsStroke.Color = themes.Dark.Stroke
 dsStroke.Thickness = 1.5
@@ -165,6 +129,12 @@ dsWarning.TextColor3 = Color3.fromRGB(255, 80, 80)
 dsWarning.TextSize = 10
 dsWarning.Font = Enum.Font.GothamMedium
 dsWarning.TextWrapped = true
+
+Instance.new("UIListLayout", DeviceSelectorGui).SortOrder = Enum.SortOrder.LayoutOrder
+local spacer = Instance.new("Frame", DeviceSelectorGui)
+spacer.Size = UDim2.new(1, 0, 0, 95)
+spacer.BackgroundTransparency = 1
+spacer.LayoutOrder = 1
 
 local function createSelectorButton(name, scaleValue)
     local btn = Instance.new("TextButton", DeviceSelectorGui)
@@ -227,7 +197,7 @@ function loadMainHub(scale)
     Title.Size = UDim2.new(1, -math.floor(35 * scale), 1, 0)
     Title.Position = UDim2.new(0, math.floor(10 * scale), 0, 0)
     Title.BackgroundTransparency = 1
-    Title.Text = "APEX HUB"
+    Title.Text = "APEX HUB (PRO)"
     Title.TextColor3 = Color3.fromRGB(255, 255, 255)
     Title.TextSize = math.floor(13 * scale)
     Title.Font = Enum.Font.GothamBold
@@ -247,7 +217,7 @@ function loadMainHub(scale)
     ContentFrame.Position = UDim2.new(0, math.floor(6 * scale), 0, topBarH + 4)
     ContentFrame.BackgroundTransparency = 1
     ContentFrame.BorderSizePixel = 0
-    ContentFrame.CanvasSize = UDim2.new(0, 0, 0, math.floor(1100 * scale))
+    ContentFrame.CanvasSize = UDim2.new(0, 0, 0, math.floor(1150 * scale))
     ContentFrame.ScrollBarThickness = math.floor(2 * scale)
 
     local UIListLayout = Instance.new("UIListLayout", ContentFrame)
@@ -265,6 +235,56 @@ function loadMainHub(scale)
     RightListLayout.SortOrder = Enum.SortOrder.LayoutOrder
     RightListLayout.Padding = UDim.new(0, math.floor(6 * scale))
 
+    -- Sofortige MM2 / Role Erkennung (auch vor dem Ziehen der Waffe)
+    local function getPlayerRole(player)
+        local success, role, col = pcall(function()
+            if not player.Character then return "Innocent", Color3.fromRGB(50, 255, 100) end
+            
+            -- Prüfe ob MM2 PlayerValues / Leaderstats oder Data vorhanden sind
+            local stats = player:FindFirstChild("leaderstats")
+            if stats then
+                local rou = stats:FindFirstChild("Round") or stats:FindFirstChild("Role")
+                if rou then
+                    local val = tostring(rou.Value):lower()
+                    if val:find("murder") then return "Murderer", Color3.fromRGB(255, 50, 50) end
+                    if val:find("sheriff") then return "Sheriff", Color3.fromRGB(50, 150, 255) end
+                end
+            end
+
+            -- Direktes Inventar und Charakter-Durchsuchung
+            local backpack = player:FindFirstChildOfClass("Backpack")
+            local character = player.Character
+
+            local function checkItem(item)
+                if item:IsA("Tool") then
+                    local name = item.Name:lower()
+                    if name:find("knife") or name:find("murder") then
+                        return "Murderer", Color3.fromRGB(255, 50, 50)
+                    elseif name:find("gun") or name:find("revolver") or name:find("sheriff") then
+                        return "Sheriff", Color3.fromRGB(50, 150, 255)
+                    end
+                end
+                return nil
+            end
+
+            if backpack then
+                for _, item in ipairs(backpack:GetChildren()) do
+                    local r, c = checkItem(item)
+                    if r then return r, c end
+                end
+            end
+            for _, item in ipairs(character:GetChildren()) do
+                local r, c = checkItem(item)
+                if r then return r, c end
+            end
+
+            return "Innocent", Color3.fromRGB(50, 255, 100)
+        end)
+        if success then return role, col end
+        return "Innocent", Color3.fromRGB(50, 255, 100)
+    end
+
+    -- Teleport & Fling Hilfsfunktionen
     local function teleportToPlayer(target)
         pcall(function()
             if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
@@ -303,9 +323,10 @@ function loadMainHub(scale)
             end
 
             local connection
-            connection = RunService.Heartbeat:Connect(function()
+            connection = RunService.Heartbeat:GetPropertyChangedSignal("Connected"):Connect(function() end)
+            local runConn = RunService.Heartbeat:Connect(function()
                 pcall(function()
-                    if targetRoot and myRoot and targetChar:FindFirstChild("Humanoid") and targetChar.Humanoid.Health > 0 then
+                    if targetRoot and myRoot then
                         local moveDir = targetRoot.AssemblyLinearVelocity
                         myRoot.CFrame = targetRoot.CFrame + (moveDir * 0.03) + Vector3.new(0, 0.5, 0)
                         myRoot.AssemblyLinearVelocity = Vector3.new(300000, 300000, 300000)
@@ -315,7 +336,7 @@ function loadMainHub(scale)
             end)
 
             task.wait(0.5)
-            if connection then connection:Disconnect() end
+            if runConn then runConn:Disconnect() end
 
             myHum.PlatformStand = false
             myHum:ChangeState(Enum.HumanoidStateType.GettingUp)
@@ -328,6 +349,93 @@ function loadMainHub(scale)
                 myRoot.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
                 myRoot.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
                 myRoot.CFrame = originalPos
+            end
+        end)
+    end
+
+    -- Map Vote Spammer mit sicherem Loop und Resets
+    local function startMapVoteSpam(mapIndex, targetPos)
+        local loopKey = "MapVote_" .. mapIndex
+        if activeLoops[loopKey] then
+            activeLoops[loopKey] = false
+            return
+        end
+
+        activeLoops[loopKey] = true
+        task.spawn(function()
+            while activeLoops[loopKey] do
+                pcall(function()
+                    local char = LocalPlayer.Character
+                    local root = char and char:FindFirstChild("HumanoidRootPart")
+                    local hum = char and char:FindFirstChildOfClass("Humanoid")
+                    
+                    if root and hum and hum.Health > 0 then
+                        -- Teleport zur Position
+                        root.CFrame = CFrame.new(targetPos)
+                        task.wait(0.1)
+                        -- Reset erzwingen durch Health auf 0 (oder Humanoid:TakeDamage)
+                        hum.Health = 0
+                    end
+                end)
+                task.wait(0.6) -- Stabiler Delay, damit das Spiel den Reset sauber verarbeitet
+            end
+        end)
+    end
+
+    -- Gun ESP & Auto Grab Gun für am Boden liegende Waffen
+    local droppedGuns = {}
+    local function scanForDroppedGuns()
+        pcall(function()
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("Tool") and not obj.Parent:FindFirstChildOfClass("Humanoid") then
+                    local name = obj.Name:lower()
+                    if name:find("gun") or name:find("revolver") or name:find("sheriff") then
+                        local handle = obj:FindFirstChild("Handle") or obj:FindFirstChildOfClass("BasePart")
+                        if handle then
+                            if gunEspEnabled and not droppedGuns[obj] then
+                                local hl = Instance.new("Highlight", obj)
+                                hl.FillColor = Color3.fromRGB(255, 255, 0)
+                                hl.OutlineColor = Color3.fromRGB(255, 200, 0)
+                                hl.FillTransparency = 0.3
+                                
+                                local bg = Instance.new("BillboardGui", handle)
+                                bg.Size = UDim2.new(0, 80, 0, 30)
+                                bg.StudsOffset = Vector3.new(0, 2, 0)
+                                bg.AlwaysOnTop = true
+                                
+                                local tl = Instance.new("TextLabel", bg)
+                                tl.Size = UDim2.new(1, 0, 1, 0)
+                                tl.BackgroundTransparency = 1
+                                tl.Text = "[ GUN ]"
+                                tl.TextColor3 = Color3.fromRGB(255, 255, 0)
+                                tl.TextScaled = true
+                                tl.Font = Enum.Font.GothamBold
+                                
+                                droppedGuns[obj] = {hl = hl, bg = bg}
+                            end
+
+                            if autoGrabGunEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                                local root = LocalPlayer.Character.HumanoidRootPart
+                                local origPos = root.CFrame
+                                root.CFrame = handle.CFrame + Vector3.new(0, 1, 0)
+                                task.wait(0.15)
+                                firetouchinterest(root, handle, 0)
+                                firetouchinterest(root, handle, 1)
+                                task.wait(0.1)
+                                root.CFrame = origPos
+                            end
+                        end
+                    end
+                end
+            end
+
+            -- Cleanup gelöschter Guns
+            for obj, data in pairs(droppedGuns) do
+                if not obj.Parent then
+                    if data.hl then data.hl:Destroy() end
+                    if data.bg then data.bg:Destroy() end
+                    droppedGuns[obj] = nil
+                end
             end
         end)
     end
@@ -402,9 +510,7 @@ function loadMainHub(scale)
         end
 
         if data.callback then
-            task.spawn(function()
-                pcall(function() data.callback(data.state) end)
-            end)
+            task.spawn(function() pcall(function() data.callback(data.state) end) end)
         end
     end
 
@@ -477,7 +583,6 @@ function loadMainHub(scale)
         arrow.BackgroundTransparency = 1
         arrow.Text = "▼"
         arrow.TextColor3 = Color3.fromRGB(180, 180, 180)
-        arrow.TextSize = math.floor(11 * scale)
 
         local listContainer = Instance.new("ScrollingFrame", container)
         listContainer.Size = UDim2.new(1, -4, 0, math.floor(120 * scale))
@@ -488,9 +593,7 @@ function loadMainHub(scale)
         listContainer.ScrollBarThickness = 2
         listContainer.Visible = false
 
-        local listLayout = Instance.new("UIListLayout", listContainer)
-        listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        listLayout.Padding = UDim.new(0, 2)
+        Instance.new("UIListLayout", listContainer).SortOrder = Enum.SortOrder.LayoutOrder
 
         for _, optName in ipairs(options) do
             local optBtn = Instance.new("TextButton", listContainer)
@@ -500,7 +603,6 @@ function loadMainHub(scale)
             optBtn.Text = tostring(optName)
             optBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
             optBtn.TextSize = math.floor(11 * scale)
-            optBtn.Font = Enum.Font.Gotham
             Instance.new("UICorner", optBtn).CornerRadius = UDim.new(0, 5)
 
             bindClick(optBtn, function()
@@ -515,16 +617,15 @@ function loadMainHub(scale)
         local isOpen = false
         bindClick(selectBtn, function()
             isOpen = not isOpen
-            local targetSize = isOpen and UDim2.new(1, 0, 0, math.floor(160 * scale)) or UDim2.new(1, 0, 0, math.floor(32 * scale))
-            TweenService:Create(container, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize}):Play()
+            container.Size = isOpen and UDim2.new(1, 0, 0, math.floor(160 * scale)) or UDim2.new(1, 0, 0, math.floor(32 * scale))
             listContainer.Visible = isOpen
             arrow.Text = isOpen and "▲" or "▼"
         end)
     end
 
-    local function createPlayerDropdown(parentContainer)
+    local function createPlayerDropdown(parentContainer, titleText, isBring)
         local container = Instance.new("Frame", parentContainer)
-        container.Name = "DropdownContainer"
+        container.Name = isBring and "BringDropdownContainer" or "DropdownContainer"
         container.Size = UDim2.new(1, 0, 0, math.floor(32 * scale))
         container.BackgroundColor3 = themes[currentThemeName].ButtonOff
         container.BorderSizePixel = 0
@@ -534,7 +635,7 @@ function loadMainHub(scale)
         local selectBtn = Instance.new("TextButton", container)
         selectBtn.Size = UDim2.new(1, 0, 1, 0)
         selectBtn.BackgroundTransparency = 1
-        selectBtn.Text = " TP to Player: [Choose]"
+        selectBtn.Text = " " .. titleText .. ": [Choose]"
         selectBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
         selectBtn.TextSize = math.floor(11 * scale)
         selectBtn.Font = Enum.Font.GothamMedium
@@ -546,7 +647,6 @@ function loadMainHub(scale)
         arrow.BackgroundTransparency = 1
         arrow.Text = "▼"
         arrow.TextColor3 = Color3.fromRGB(180, 180, 180)
-        arrow.TextSize = math.floor(11 * scale)
         
         local listContainer = Instance.new("ScrollingFrame", container)
         listContainer.Size = UDim2.new(1, -4, 0, math.floor(120 * scale))
@@ -557,10 +657,8 @@ function loadMainHub(scale)
         listContainer.ScrollBarThickness = 2
         listContainer.Visible = false
         
-        local listLayout = Instance.new("UIListLayout", listContainer)
-        listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        listLayout.Padding = UDim.new(0, 3)
-        
+        Instance.new("UIListLayout", listContainer).SortOrder = Enum.SortOrder.LayoutOrder
+
         local function refreshPlayers()
             for _, child in ipairs(listContainer:GetChildren()) do
                 if child:IsA("TextButton") then child:Destroy() end
@@ -576,17 +674,16 @@ function loadMainHub(scale)
                     pBtn.Text = p.Name
                     pBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
                     pBtn.TextSize = math.floor(11 * scale)
-                    pBtn.Font = Enum.Font.Gotham
                     Instance.new("UICorner", pBtn).CornerRadius = UDim.new(0, 4)
                     
                     bindClick(pBtn, function()
-                        teleportToPlayer(p)
-                        selectBtn.Text = " TP: " .. p.Name
+                        if isBring then bringPlayer(p) else teleportToPlayer(p) end
+                        selectBtn.Text = " Done: " .. p.Name
                         container.Size = UDim2.new(1, 0, 0, math.floor(32 * scale))
                         listContainer.Visible = false
                         arrow.Text = "▼"
                         task.wait(1)
-                        selectBtn.Text = " TP to Player: [Choose]"
+                        selectBtn.Text = " " .. titleText .. ": [Choose]"
                     end)
                 end
             end
@@ -597,258 +694,13 @@ function loadMainHub(scale)
         bindClick(selectBtn, function()
             isOpen = not isOpen
             if isOpen then refreshPlayers() end
-            local targetSize = isOpen and UDim2.new(1, 0, 0, math.floor(155 * scale)) or UDim2.new(1, 0, 0, math.floor(32 * scale))
-            TweenService:Create(container, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize}):Play()
+            container.Size = isOpen and UDim2.new(1, 0, 0, math.floor(155 * scale)) or UDim2.new(1, 0, 0, math.floor(32 * scale))
             listContainer.Visible = isOpen
             arrow.Text = isOpen and "▲" or "▼"
         end)
     end
 
-    local function createBringDropdown(parentContainer)
-        local container = Instance.new("Frame", parentContainer)
-        container.Name = "BringDropdownContainer"
-        container.Size = UDim2.new(1, 0, 0, math.floor(32 * scale))
-        container.BackgroundColor3 = themes[currentThemeName].ButtonOff
-        container.BorderSizePixel = 0
-        container.ClipsDescendants = true
-        Instance.new("UICorner", container).CornerRadius = UDim.new(0, math.floor(6 * scale))
-        
-        local selectBtn = Instance.new("TextButton", container)
-        selectBtn.Size = UDim2.new(1, 0, 1, 0)
-        selectBtn.BackgroundTransparency = 1
-        selectBtn.Text = " Bring Player: [Choose]"
-        selectBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-        selectBtn.TextSize = math.floor(11 * scale)
-        selectBtn.Font = Enum.Font.GothamMedium
-        selectBtn.TextXAlignment = Enum.TextXAlignment.Left
-        
-        local arrow = Instance.new("TextLabel", container)
-        arrow.Size = UDim2.new(0, math.floor(25 * scale), 1, 0)
-        arrow.Position = UDim2.new(1, -math.floor(25 * scale), 0, 0)
-        arrow.BackgroundTransparency = 1
-        arrow.Text = "▼"
-        arrow.TextColor3 = Color3.fromRGB(180, 180, 180)
-        arrow.TextSize = math.floor(11 * scale)
-        
-        local listContainer = Instance.new("ScrollingFrame", container)
-        listContainer.Size = UDim2.new(1, -4, 0, math.floor(120 * scale))
-        listContainer.Position = UDim2.new(0, 2, 0, math.floor(34 * scale))
-        listContainer.BackgroundTransparency = 1
-        listContainer.BorderSizePixel = 0
-        listContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
-        listContainer.ScrollBarThickness = 2
-        listContainer.Visible = false
-        
-        local listLayout = Instance.new("UIListLayout", listContainer)
-        listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        listLayout.Padding = UDim.new(0, 3)
-        
-        local function refreshPlayers()
-            for _, child in ipairs(listContainer:GetChildren()) do
-                if child:IsA("TextButton") then child:Destroy() end
-            end
-            local count = 0
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= LocalPlayer then
-                    count = count + 1
-                    local pBtn = Instance.new("TextButton", listContainer)
-                    pBtn.Size = UDim2.new(1, 0, 0, math.floor(28 * scale))
-                    pBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-                    pBtn.BorderSizePixel = 0
-                    pBtn.Text = p.Name
-                    pBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
-                    pBtn.TextSize = math.floor(11 * scale)
-                    pBtn.Font = Enum.Font.Gotham
-                    Instance.new("UICorner", pBtn).CornerRadius = UDim.new(0, 4)
-                    
-                    bindClick(pBtn, function()
-                        bringPlayer(p)
-                        selectBtn.Text = " Brought: " .. p.Name
-                        container.Size = UDim2.new(1, 0, 0, math.floor(32 * scale))
-                        listContainer.Visible = false
-                        arrow.Text = "▼"
-                        task.wait(1)
-                        selectBtn.Text = " Bring Player: [Choose]"
-                    end)
-                end
-            end
-            listContainer.CanvasSize = UDim2.new(0, 0, 0, count * math.floor(31 * scale))
-        end
-        
-        local isOpen = false
-        bindClick(selectBtn, function()
-            isOpen = not isOpen
-            if isOpen then refreshPlayers() end
-            local targetSize = isOpen and UDim2.new(1, 0, 0, math.floor(155 * scale)) or UDim2.new(1, 0, 0, math.floor(32 * scale))
-            TweenService:Create(container, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize}):Play()
-            listContainer.Visible = isOpen
-            arrow.Text = isOpen and "▲" or "▼"
-        end)
-    end
-
-    local function createFlingDropdown(parentContainer)
-        local container = Instance.new("Frame", parentContainer)
-        container.Name = "FlingDropdownContainer"
-        container.Size = UDim2.new(1, 0, 0, math.floor(32 * scale))
-        container.BackgroundColor3 = themes[currentThemeName].ButtonOff
-        container.BorderSizePixel = 0
-        container.ClipsDescendants = true
-        Instance.new("UICorner", container).CornerRadius = UDim.new(0, math.floor(6 * scale))
-        
-        local selectBtn = Instance.new("TextButton", container)
-        selectBtn.Size = UDim2.new(1, 0, 1, 0)
-        selectBtn.BackgroundTransparency = 1
-        selectBtn.Text = " Dropkick Fling: [Choose]"
-        selectBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-        selectBtn.TextSize = math.floor(11 * scale)
-        selectBtn.Font = Enum.Font.GothamMedium
-        selectBtn.TextXAlignment = Enum.TextXAlignment.Left
-        
-        local arrow = Instance.new("TextLabel", container)
-        arrow.Size = UDim2.new(0, math.floor(25 * scale), 1, 0)
-        arrow.Position = UDim2.new(1, -math.floor(25 * scale), 0, 0)
-        arrow.BackgroundTransparency = 1
-        arrow.Text = "▼"
-        arrow.TextColor3 = Color3.fromRGB(180, 180, 180)
-        arrow.TextSize = math.floor(11 * scale)
-        
-        local listContainer = Instance.new("ScrollingFrame", container)
-        listContainer.Size = UDim2.new(1, -4, 0, math.floor(120 * scale))
-        listContainer.Position = UDim2.new(0, 2, 0, math.floor(34 * scale))
-        listContainer.BackgroundTransparency = 1
-        listContainer.BorderSizePixel = 0
-        listContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
-        listContainer.ScrollBarThickness = 2
-        listContainer.Visible = false
-        
-        local listLayout = Instance.new("UIListLayout", listContainer)
-        listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        listLayout.Padding = UDim.new(0, 3)
-        
-        local function refreshPlayers()
-            for _, child in ipairs(listContainer:GetChildren()) do
-                if child:IsA("TextButton") then child:Destroy() end
-            end
-            local count = 0
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= LocalPlayer then
-                    count = count + 1
-                    local pBtn = Instance.new("TextButton", listContainer)
-                    pBtn.Size = UDim2.new(1, 0, 0, math.floor(28 * scale))
-                    pBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-                    pBtn.BorderSizePixel = 0
-                    pBtn.Text = p.Name
-                    pBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
-                    pBtn.TextSize = math.floor(11 * scale)
-                    pBtn.Font = Enum.Font.Gotham
-                    Instance.new("UICorner", pBtn).CornerRadius = UDim.new(0, 4)
-                    
-                    bindClick(pBtn, function()
-                        selectBtn.Text = " Hit: " .. p.Name
-                        container.Size = UDim2.new(1, 0, 0, math.floor(32 * scale))
-                        listContainer.Visible = false
-                        arrow.Text = "▼"
-                        flingPlayer(p)
-                        task.wait(1)
-                        selectBtn.Text = " Dropkick Fling: [Choose]"
-                    end)
-                end
-            end
-            listContainer.CanvasSize = UDim2.new(0, 0, 0, count * math.floor(31 * scale))
-        end
-        
-        local isOpen = false
-        bindClick(selectBtn, function()
-            isOpen = not isOpen
-            if isOpen then refreshPlayers() end
-            local targetSize = isOpen and UDim2.new(1, 0, 0, math.floor(155 * scale)) or UDim2.new(1, 0, 0, math.floor(32 * scale))
-            TweenService:Create(container, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize}):Play()
-            listContainer.Visible = isOpen
-            arrow.Text = isOpen and "▲" or "▼"
-        end)
-    end
-
-    local function createMapSpamDropdown(parentContainer)
-        local container = Instance.new("Frame", parentContainer)
-        container.Name = "MapSpamDropdownContainer"
-        container.Size = UDim2.new(1, 0, 0, math.floor(32 * scale))
-        container.BackgroundColor3 = themes[currentThemeName].ButtonOff
-        container.BorderSizePixel = 0
-        container.ClipsDescendants = true
-        Instance.new("UICorner", container).CornerRadius = UDim.new(0, math.floor(6 * scale))
-        
-        local selectBtn = Instance.new("TextButton", container)
-        selectBtn.Size = UDim2.new(1, 0, 1, 0)
-        selectBtn.BackgroundTransparency = 1
-        selectBtn.Text = " Spam Vote Target: [Choose]"
-        selectBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-        selectBtn.TextSize = math.floor(11 * scale)
-        selectBtn.Font = Enum.Font.GothamMedium
-        selectBtn.TextXAlignment = Enum.TextXAlignment.Left
-        
-        local arrow = Instance.new("TextLabel", container)
-        arrow.Size = UDim2.new(0, math.floor(25 * scale), 1, 0)
-        arrow.Position = UDim2.new(1, -math.floor(25 * scale), 0, 0)
-        arrow.BackgroundTransparency = 1
-        arrow.Text = "▼"
-        arrow.TextColor3 = Color3.fromRGB(180, 180, 180)
-        arrow.TextSize = math.floor(11 * scale)
-        
-        local listContainer = Instance.new("ScrollingFrame", container)
-        listContainer.Size = UDim2.new(1, -4, 0, math.floor(120 * scale))
-        listContainer.Position = UDim2.new(0, 2, 0, math.floor(34 * scale))
-        listContainer.BackgroundTransparency = 1
-        listContainer.BorderSizePixel = 0
-        listContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
-        listContainer.ScrollBarThickness = 2
-        listContainer.Visible = false
-        
-        local listLayout = Instance.new("UIListLayout", listContainer)
-        listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        listLayout.Padding = UDim.new(0, 3)
-        
-        local function refreshPlayers()
-            for _, child in ipairs(listContainer:GetChildren()) do
-                if child:IsA("TextButton") then child:Destroy() end
-            end
-            local count = 0
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= LocalPlayer then
-                    count = count + 1
-                    local pBtn = Instance.new("TextButton", listContainer)
-                    pBtn.Size = UDim2.new(1, 0, 0, math.floor(28 * scale))
-                    pBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-                    pBtn.BorderSizePixel = 0
-                    pBtn.Text = p.Name
-                    pBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
-                    pBtn.TextSize = math.floor(11 * scale)
-                    pBtn.Font = Enum.Font.Gotham
-                    Instance.new("UICorner", pBtn).CornerRadius = UDim.new(0, 4)
-                    
-                    bindClick(pBtn, function()
-                        spamTargetPlayer = p
-                        selectBtn.Text = " Target: " .. p.Name
-                        container.Size = UDim2.new(1, 0, 0, math.floor(32 * scale))
-                        listContainer.Visible = false
-                        arrow.Text = "▼"
-                    end)
-                end
-            end
-            listContainer.CanvasSize = UDim2.new(0, 0, 0, count * math.floor(31 * scale))
-        end
-        
-        local isOpen = false
-        bindClick(selectBtn, function()
-            isOpen = not isOpen
-            if isOpen then refreshPlayers() end
-            local targetSize = isOpen and UDim2.new(1, 0, 0, math.floor(155 * scale)) or UDim2.new(1, 0, 0, math.floor(32 * scale))
-            TweenService:Create(container, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize}):Play()
-            listContainer.Visible = isOpen
-            arrow.Text = isOpen and "▲" or "▼"
-        end)
-    end
-
-    local function createSpeedInputGen(parentContainer, labelText, defaultVal, min, max, callback, customSize, customTextSize)
+    local function createSpeedInputGen(parentContainer, labelText, defaultVal, min, max, callback, customSize)
         local container = Instance.new("Frame", parentContainer)
         container.Size = customSize or UDim2.new(1, 0, 0, math.floor(32 * scale))
         container.BackgroundColor3 = themes[currentThemeName].ButtonOff
@@ -861,9 +713,7 @@ function loadMainHub(scale)
         label.BackgroundTransparency = 1
         label.Text = labelText
         label.TextColor3 = Color3.fromRGB(200, 200, 200)
-        label.TextSize = customTextSize or textSize
-        label.Font = Enum.Font.GothamMedium
-        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.TextSize = textSize
 
         local textbox = Instance.new("TextBox", container)
         textbox.Size = UDim2.new(0, math.floor(50 * scale), 0, math.floor(22 * scale))
@@ -872,9 +722,7 @@ function loadMainHub(scale)
         textbox.BorderSizePixel = 0
         textbox.Text = tostring(defaultVal)
         textbox.TextColor3 = Color3.fromRGB(255, 255, 255)
-        textbox.TextSize = customTextSize or textSize
-        textbox.Font = Enum.Font.GothamBold
-        textbox.ClearTextOnFocus = true
+        textbox.TextSize = textSize
         Instance.new("UICorner", textbox).CornerRadius = UDim.new(0, 4)
 
         if not registeredSpeedInputs[labelText] then registeredSpeedInputs[labelText] = {} end
@@ -884,13 +732,8 @@ function loadMainHub(scale)
             local num = tonumber(textbox.Text)
             if num then
                 local clamped = math.clamp(num, min, max)
-                local strVal = tostring(clamped)
-                for _, tb in ipairs(registeredSpeedInputs[labelText]) do tb.Text = strVal end
+                for _, tb in ipairs(registeredSpeedInputs[labelText]) do tb.Text = tostring(clamped) end
                 pcall(function() callback(clamped) end)
-            else
-                local defStr = tostring(defaultVal)
-                for _, tb in ipairs(registeredSpeedInputs[labelText]) do tb.Text = defStr end
-                pcall(function() callback(defaultVal) end)
             end
         end)
     end
@@ -900,7 +743,7 @@ function loadMainHub(scale)
     end
 
     local function createRightSpeedInput(labelText, defaultVal, min, max, callback)
-        createSpeedInputGen(RightButtonsContainer, labelText, defaultVal, min, max, callback, UDim2.new(1, 0, 0, math.floor(30 * scale)), math.floor(10 * scale))
+        createSpeedInputGen(RightButtonsContainer, labelText, defaultVal, min, max, callback, UDim2.new(1, 0, 0, math.floor(30 * scale)))
     end
 
     local minimized = false
@@ -919,56 +762,8 @@ function loadMainHub(scale)
         end
     end)
 
-    -- ERWEITERTE SOFORTIGE ROLIENERKENNUNG (Scannt Player-Values, PlayerGui Benachrichtigungen & Inventar)
-    local function getPlayerRole(player)
-        local success, role, col = pcall(function()
-            if not player.Character then return "Innocent", Color3.fromRGB(50, 255, 100) end
-            
-            -- Methode 1: Interne MM2 Werte / Player Attributes prüfen falls vorhanden
-            if player:GetAttribute("Role") then
-                local r = player:GetAttribute("Role")
-                if r == "Murderer" then return "Murderer", Color3.fromRGB(255, 50, 50) end
-                if r == "Sheriff" then return "Sheriff", Color3.fromRGB(50, 150, 255) end
-                if r == "Hero" then return "Hero", Color3.fromRGB(255, 220, 50) end
-            end
-
-            -- Methode 2: Inventar & Backpack scannen (auch verstaute Waffen)
-            local backpack = player:FindFirstChildOfClass("Backpack")
-            local character = player.Character
-
-            local function checkTool(item)
-                if item:IsA("Tool") then
-                    local name = item.Name:lower()
-                    if name:find("knife") or name:find("murder") then
-                        return "Murderer", Color3.fromRGB(255, 50, 50)
-                    elseif name:find("gun") or name:find("revolver") or name:find("sheriff") then
-                        return "Sheriff", Color3.fromRGB(50, 150, 255)
-                    end
-                end
-                return nil
-            end
-
-            if backpack then
-                for _, item in ipairs(backpack:GetChildren()) do
-                    local r, c = checkTool(item)
-                    if r then return r, c end
-                end
-            end
-            for _, item in ipairs(character:GetChildren()) do
-                local r, c = checkTool(item)
-                if r then return r, c end
-            end
-
-            return "Innocent", Color3.fromRGB(50, 255, 100)
-        end)
-        if success then return role, col end
-        return "Innocent", Color3.fromRGB(50, 255, 100)
-    end
-
     local highlights = {}
     local billboards = {}
-    local gunHighlights = {}
-    local gunBillboards = {}
 
     local function cleanupPlayer(player)
         pcall(function()
@@ -986,7 +781,6 @@ function loadMainHub(scale)
             local root = char and char:FindFirstChild("HumanoidRootPart")
             local hum = char and char:FindFirstChild("Humanoid")
             if not root or not hum then return end
-
             hum.PlatformStand = true
 
             if bodyGyro then bodyGyro:Destroy() end
@@ -1010,36 +804,18 @@ function loadMainHub(scale)
             local char = LocalPlayer.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
             local hum = char and char:FindFirstChild("Humanoid")
-            
             if bodyGyro then bodyGyro:Destroy(); bodyGyro = nil end
             if bodyVelocity then bodyVelocity:Destroy(); bodyVelocity = nil end
-
-            if root and hum then
-                local rayParams = RaycastParams.new()
-                rayParams.FilterType = Enum.RaycastFilterType.Exclude
-                rayParams.FilterDescendantsInstances = {char}
-                
-                local rayResult = workspace:Raycast(root.Position, Vector3.new(0, -5, 0), rayParams)
-                
-                if rayResult then
-                    hum.PlatformStand = false
-                    hum:ChangeState(Enum.HumanoidStateType.GettingUp)
-                    root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-                    root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-                else
-                    hum.PlatformStand = false
-                    hum:ChangeState(Enum.HumanoidStateType.Freefall)
-                    root.AssemblyLinearVelocity = Vector3.new(0, -15, 0)
-                    root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-                end
+            if hum then
+                hum.PlatformStand = false
+                hum:ChangeState(Enum.HumanoidStateType.GettingUp)
             end
         end)
     end
 
     local function placeTPRed()
         pcall(function()
-            local char = LocalPlayer.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
+            local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
             if not root then return end
             savedPositionRed = root.Position
             if tpVisualPartRed then tpVisualPartRed:Destroy() end
@@ -1059,8 +835,7 @@ function loadMainHub(scale)
 
     local function placeTPGreen()
         pcall(function()
-            local char = LocalPlayer.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
+            local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
             if not root then return end
             savedPositionGreen = root.Position
             if tpVisualPartGreen then tpVisualPartGreen:Destroy() end
@@ -1077,25 +852,6 @@ function loadMainHub(scale)
         end)
     end
     local function tpGreen() pcall(function() local r = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") if r and savedPositionGreen then r.CFrame = CFrame.new(savedPositionGreen + Vector3.new(0, .5, 0)) end end) end
-
-    -- AUTO GRAB GUN & GUN ESP LOGIK
-    local function findDroppedGun()
-        for _, obj in ipairs(Workspace:GetDescendants()) do
-            if obj:IsA("Tool") and not obj.Parent:FindFirstChildOfClass("Humanoid") then
-                local lname = obj.Name:lower()
-                if lname:find("gun") or lname:find("revolver") or obj:FindFirstChild("Handle") then
-                    return obj
-                end
-            end
-        end
-        -- Fallback für MM2 spezifische Gun-Drops (oftmals Part namens "GunDrop")
-        for _, part in ipairs(Workspace:GetDescendants()) do
-            if part:IsA("BasePart") and (part.Name == "GunDrop" or part.Name == "Drop") then
-                return part
-            end
-        end
-        return nil
-    end
 
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
@@ -1115,17 +871,17 @@ function loadMainHub(scale)
     UserInputService.JumpRequest:Connect(function()
         if infJumpEnabled then
             pcall(function()
-                local character = LocalPlayer.Character
-                local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-                if humanoid then humanoid:ChangeState(Enum.HumanoidStateType.Jumping) end
+                local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
             end)
         end
     end)
 
-    -- HAUPT-LOOP FÜR ESP, ANTI-FLING, AUTO-GRAB & MAP VOTING SPAM
+    -- Haupt-Loop für ESP, Rollen, Noclip & Gun Scanning
     RunService.Stepped:Connect(function()
         pcall(function()
-            -- 1. SPIELER ESP & ROLES
+            scanForDroppedGuns()
+
             for _, player in ipairs(Players:GetPlayers()) do
                 if player ~= LocalPlayer then
                     local character = player.Character
@@ -1151,11 +907,9 @@ function loadMainHub(scale)
                         if rolesEnabled then
                             local head = character:FindFirstChild("Head")
                             if head then
-                                local bgName = "ApexBillboard_" .. player.Name
                                 if not billboards[player] or billboards[player].Adornee ~= head then
                                     if billboards[player] then billboards[player]:Destroy() end
                                     local bg = Instance.new("BillboardGui", character)
-                                    bg.Name = bgName
                                     bg.Size = UDim2.new(0, 120, 0, 40)
                                     bg.StudsOffset = Vector3.new(0, 2.5, 0)
                                     bg.AlwaysOnTop = true
@@ -1185,55 +939,6 @@ function loadMainHub(scale)
                 end
             end
 
-            -- 2. GUN ESP (Nur wenn Gun auf dem Boden liegt)
-            local droppedGun = findDroppedGun()
-            if droppedGun then
-                local targetPart = droppedGun:IsA("Tool") and droppedGun:FindFirstChild("Handle") or droppedGun
-                if targetPart and targetPart:IsA("BasePart") then
-                    if not gunHighlights[droppedGun] then
-                        local hl = Instance.new("Highlight", droppedGun)
-                        hl.FillColor = Color3.fromRGB(255, 255, 0)
-                        hl.OutlineColor = Color3.fromRGB(255, 200, 0)
-                        hl.FillTransparency = 0.3
-                        gunHighlights[droppedGun] = hl
-
-                        local bg = Instance.new("BillboardGui", targetPart)
-                        bg.Size = UDim2.new(0, 100, 0, 30)
-                        bg.StudsOffset = Vector3.new(0, 2, 0)
-                        bg.AlwaysOnTop = true
-                        local tl = Instance.new("TextLabel", bg)
-                        tl.Size = UDim2.new(1, 0, 1, 0)
-                        tl.BackgroundTransparency = 1
-                        tl.Text = "Gun"
-                        tl.TextColor3 = Color3.fromRGB(255, 255, 0)
-                        tl.TextScaled = true
-                        tl.Font = Enum.Font.GothamBold
-                        tl.TextStrokeTransparency = 0.2
-                        gunBillboards[droppedGun] = bg
-
-                        -- Auto Grab Gun Logik
-                        if autoGrabGunEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                            task.spawn(function()
-                                local myRoot = LocalPlayer.Character.HumanoidRootPart
-                                local originalPos = myRoot.CFrame
-                                myRoot.CFrame = targetPart.CFrame + Vector3.new(0, 2, 0)
-                                task.wait(0.2)
-                                myRoot.CFrame = originalPos
-                            end)
-                        end
-                    end
-                end
-            else
-                -- Aufräumen falls Gun aufgehoben wurde
-                for g, hl in pairs(gunHighlights) do
-                    if not g or not g.Parent then
-                        hl:Destroy()
-                        gunHighlights[g] = nil
-                        if gunBillboards[g] then gunBillboards[g]:Destroy(); gunBillboards[g] = nil end
-                    end
-                end
-            end
-
             local char = LocalPlayer.Character
             if not char then return end
             local hum = char:FindFirstChild("Humanoid")
@@ -1248,10 +953,7 @@ function loadMainHub(scale)
                 end
             end
 
-            if speedEnabled and not flyEnabled then
-                hum.WalkSpeed = currentSpeed
-            end
-
+            if speedEnabled and not flyEnabled then hum.WalkSpeed = currentSpeed end
             if noclipEnabled then
                 for _, part in ipairs(char:GetDescendants()) do
                     if part:IsA("BasePart") and part.CanCollide then part.CanCollide = false end
@@ -1259,25 +961,16 @@ function loadMainHub(scale)
             end
 
             if flyEnabled then
-                if not bodyGyro or not bodyVelocity or bodyGyro.Parent ~= root then
-                    startFly()
-                end
+                if not bodyGyro or not bodyVelocity or bodyGyro.Parent ~= root then startFly() end
                 if bodyGyro and bodyVelocity then
                     bodyGyro.cframe = Camera.CFrame
                     local moveDir = Vector3.new(0, 0, 0)
                     local camCF = Camera.CFrame
-                    
                     if keysPressed.W then moveDir += camCF.LookVector end
                     if keysPressed.S then moveDir -= camCF.LookVector end
                     if keysPressed.A then moveDir -= camCF.RightVector end
                     if keysPressed.D then moveDir += camCF.RightVector end
                     
-                    local humMove = hum.MoveDirection
-                    if humMove.Magnitude > 0 then
-                        local localMove = camCF:VectorToObjectSpace(humMove)
-                        moveDir += (camCF.LookVector * -localMove.Z) + (camCF.RightVector * localMove.X)
-                    end
-
                     local verticalMove = 0
                     if keysPressed.Space or hum.Jump then verticalMove = 1 end
                     if keysPressed.LeftShift then verticalMove = -1 end
@@ -1288,59 +981,18 @@ function loadMainHub(scale)
                     else
                         bodyVelocity.velocity = Vector3.new(0, 0, 0)
                     end
-
-                    for _, part in ipairs(char:GetDescendants()) do
-                        if part:IsA("BasePart") then part.CanCollide = false end
-                    end
+                    for _, part in ipairs(char:GetDescendants()) do if part:IsA("BasePart") then part.CanCollide = false end end
                 end
             end
         end)
     end)
 
-    -- STABILE SPAM VOTE MAP SCHLEIFE (Mit Auto-Recovery nach Resets)
-    task.spawn(function()
-        while true do
-            task.wait(0.1)
-            if activeMapSpam and spamTargetPlayer and spamTargetPlayer.Character then
-                local tChar = spamTargetPlayer.Character
-                local tRoot = tChar:FindFirstChild("HumanoidRootPart")
-                local tHum = tChar:FindFirstChildOfClass("Humanoid")
-                
-                if tRoot and tHum and tHum.Health > 0 then
-                    local targetPos = Vector3.new(25.8, 507.1, 49.4)
-                    if activeMapSpam == "Map2" then
-                        targetPos = Vector3.new(13.9, 507.1, 50.5)
-                    elseif activeMapSpam == "Map3" then
-                        targetPos = Vector3.new(1.5, 507.1, 49.0)
-                    end
-
-                    -- Teleportiere zur Map Vote Position
-                    tRoot.CFrame = CFrame.new(targetPos)
-                    task.wait(0.05)
-                    -- Reset erzwingen durch Health = 0 oder PlatformStand/Break
-                    tHum.Health = 0
-                    task.wait(0.3) -- Kurz warten bis Respawn eingreift
-                end
-            end
-        end
-    end)
-
-    LocalPlayer.CharacterAdded:Connect(function(newChar)
-        task.wait(0.6)
-        pcall(function()
-            local hum = newChar:WaitForChild("Humanoid", 3)
-            if hum then
-                if speedEnabled then hum.WalkSpeed = currentSpeed end
-            end
-            if flyEnabled then startFly() end
-        end)
-    end)
-
-    -- UI ELEMENTE ERSTELLEN
+    -- UI Elemente aufbauen
     createButton("Body ESP", function(state) espEnabled = state end, true, espEnabled)
     createButton("Role Billboard", function(state) rolesEnabled = state end, true, rolesEnabled)
+    createButton("Gun ESP", function(state) gunEspEnabled = state end, true, gunEspEnabled)
     createButton("Auto Grab Gun", function(state) autoGrabGunEnabled = state end, true, autoGrabGunEnabled)
-    
+
     createButton("Speed Boost", function(state)
         speedEnabled = state
         if not state and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
@@ -1356,95 +1008,50 @@ function loadMainHub(scale)
     createSpeedInput("Fly Speed:", currentFlySpeed, 1, 300, function(val) currentFlySpeed = val end)
 
     createButton("Inf Jump", function(state) infJumpEnabled = state end, true, infJumpEnabled)
-    createButton("Noclip", function(state) 
-        noclipEnabled = state 
-        if not state and LocalPlayer.Character then
-            for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
-                if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then part.CanCollide = true end
-            end
-        end
-    end, true, noclipEnabled)
+    createButton("Noclip", function(state) noclipEnabled = state end, true, noclipEnabled)
 
     createButton("PLACE TP (RED)", function() placeTPRed() end, false)
     createButton("TP (RED)", function() tpRed() end, false)
     createButton("PLACE TP (GREEN)", function() placeTPGreen() end, false)
     createButton("TP (GREEN)", function() tpGreen() end, false)
 
-    createPlayerDropdown(ContentFrame)
-    createBringDropdown(ContentFrame)
-    createFlingDropdown(ContentFrame)
-    createMapSpamDropdown(ContentFrame)
+    createPlayerDropdown(ContentFrame, "TP to Player", false)
+    createPlayerDropdown(ContentFrame, "Bring Player", true)
+    createPlayerDropdown(ContentFrame, "Dropkick Fling", false) -- Verwendet dieselbe Auswahlliste
 
     createButton("Spam Vote Map 1", function(state)
-        if state then activeMapSpam = "Map1" else activeMapSpam = nil end
+        startMapVoteSpam(1, Vector3.new(25.8, 507.1, 49.4))
     end, true, false)
 
     createButton("Spam Vote Map 2", function(state)
-        if state then activeMapSpam = "Map2" else activeMapSpam = nil end
+        startMapVoteSpam(2, Vector3.new(13.9, 507.1, 50.5))
     end, true, false)
 
     createButton("Spam Vote Map 3", function(state)
-        if state then activeMapSpam = "Map3" else activeMapSpam = nil end
+        startMapVoteSpam(3, Vector3.new(1.5, 507.1, 49.0))
     end, true, false)
 
-    createDropdown("Theme", {"Dark", "Purple", "Ocean", "Crimson", "Emerald", "Sunset", "Cyberpunk", "Matrix", "Midnight"}, function(name)
-        applyTheme(name)
-    end)
+    createDropdown("Theme", {"Dark", "Purple", "Ocean", "Crimson", "Cyberpunk"}, function(name) applyTheme(name) end)
+    createDropdown("Mode", {"Normal", "Buttons"}, function(name) updateMode(name) end)
 
-    createDropdown("Mode", {"Normal", "Buttons"}, function(name)
-        updateMode(name)
-    end)
-
-    -- RECHTE SEITE (BUTTONS MODUS DUPLIKATE)
+    -- Rechte Seitenleiste Buttons (falls "Buttons" Mode aktiv)
     createRightButton("Body ESP", function(state) espEnabled = state end, true, espEnabled)
     createRightButton("Role Billboard", function(state) rolesEnabled = state end, true, rolesEnabled)
+    createRightButton("Gun ESP", function(state) gunEspEnabled = state end, true, gunEspEnabled)
     createRightButton("Auto Grab Gun", function(state) autoGrabGunEnabled = state end, true, autoGrabGunEnabled)
-    createRightButton("Speed Boost", function(state)
-        speedEnabled = state
-        if not state and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-            LocalPlayer.Character.Humanoid.WalkSpeed = 16
-        end
-    end, true, speedEnabled)
+    createRightButton("Speed Boost", function(state) speedEnabled = state end, true, speedEnabled)
     createRightSpeedInput("Speed Boost:", currentSpeed, 1, 150, function(val) currentSpeed = val end)
-
-    createRightButton("Fly", function(state)
-        flyEnabled = state
-        if state then startFly() else stopFly() end
-    end, true, flyEnabled)
+    createRightButton("Fly", function(state) flyEnabled = state if state then startFly() else stopFly() end end, true, flyEnabled)
     createRightSpeedInput("Fly Speed:", currentFlySpeed, 1, 300, function(val) currentFlySpeed = val end)
-
     createRightButton("Inf Jump", function(state) infJumpEnabled = state end, true, infJumpEnabled)
-    createRightButton("Noclip", function(state) 
-        noclipEnabled = state 
-        if not state and LocalPlayer.Character then
-            for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
-                if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then part.CanCollide = true end
-            end
-        end
-    end, true, noclipEnabled)
-
+    createRightButton("Noclip", function(state) noclipEnabled = state end, true, noclipEnabled)
     createRightButton("PLACE TP (RED)", function() placeTPRed() end, false)
     createRightButton("TP (RED)", function() tpRed() end, false)
     createRightButton("PLACE TP (GREEN)", function() placeTPGreen() end, false)
     createRightButton("TP (GREEN)", function() tpGreen() end, false)
 
-    createPlayerDropdown(RightButtonsContainer)
-    createBringDropdown(RightButtonsContainer)
-    createFlingDropdown(RightButtonsContainer)
-    createMapSpamDropdown(RightButtonsContainer)
-
-    createButtonGen(RightButtonsContainer, "Spam Vote Map 1", function(state)
-        if state then activeMapSpam = "Map1" else activeMapSpam = nil end
-    end, true, false, UDim2.new(1, 0, 0, math.floor(30 * scale)), math.floor(11 * scale))
-
-    createButtonGen(RightButtonsContainer, "Spam Vote Map 2", function(state)
-        if state then activeMapSpam = "Map2" else activeMapSpam = nil end
-    end, true, false, UDim2.new(1, 0, 0, math.floor(30 * scale)), math.floor(11 * scale))
-
-    createButtonGen(RightButtonsContainer, "Spam Vote Map 3", function(state)
-        if state then activeMapSpam = "Map3" else activeMapSpam = nil end
-    end, true, false, UDim2.new(1, 0, 0, math.floor(30 * scale)), math.floor(11 * scale))
+    createPlayerDropdown(RightButtonsContainer, "TP to Player", false)
+    createPlayerDropdown(RightButtonsContainer, "Bring Player", true)
 
     Players.PlayerRemoving:Connect(cleanupPlayer)
 end
-
